@@ -2,9 +2,9 @@
 RegisterNetEvent('eboueur:receiveZones')
 AddEventHandler('eboueur:receiveZones', function(zones)
     if type(zones) == 'table' then
-        window.customZones = zones
-        -- Envoie à la NUI pour mise à jour (optionnel)
-        SendNUIMessage({ action = 'updateZones', zones = zones })
+        -- stocker localement et envoyer à la NUI pour mise à jour
+        local serverZones = zones
+        SendNUIMessage({ action = 'updateZones', zones = serverZones })
     end
 end)
 
@@ -86,6 +86,8 @@ function toggleUI()
     if uiOpen then
         TriggerServerEvent('eboueur:requestData')
         TriggerServerEvent('eboueur:requestZones') -- Synchronisation auto des zones personnalisées
+        -- envoyer l'état actuel des toggles au NUI
+        SendNUIMessage({ action = 'updateSettings', jobBlipVisible = jobBlipVisible, garageMarkerVisible = garageMarkerVisible })
     end
 end
 
@@ -111,7 +113,7 @@ local function applyWorkOutfit()
     ClearPedTasks(ped)
     -- Try qb-clothing integration first (many servers expose events/exports differently).
     local applied = false
-    if GetResourceState('qb-clothing') == 'started' then
+    if GetResourceState('qb-clothing') == 'started' and Config.WorkOutfit and type(Config.WorkOutfit) == 'table' then
         local ok, err = pcall(function()
             -- Try common client events (best-effort). If any exists it should apply the outfit.
             TriggerEvent('qb-clothing:client:loadOutfit', Config.WorkOutfit)
@@ -144,8 +146,13 @@ local function applyWorkOutfit()
             end
         end
     end
-    -- If qb-clothing present try to save this outfit as 'Eboueur' on the server
-    saveOutfitToQbClothing(Config.WorkOutfit)
+    -- If qb-clothing present try to save this outfit as 'Eboueur' on the server (guarded)
+    if type(saveOutfitToQbClothing) == 'function' and Config.WorkOutfit then
+        local ok, err = pcall(saveOutfitToQbClothing, Config.WorkOutfit)
+        if not ok then
+            print('[eboueur] saveOutfitToQbClothing failed: ' .. tostring(err))
+        end
+    end
     FreezeEntityPosition(ped, false)
     wearingWorkOutfit = true
     TriggerEvent('chat:addMessage', { args = { '^2EBOUEUR', 'Tenue de travail appliquée.' } })
@@ -153,6 +160,10 @@ end
 
 -- Tentative de sauvegarde automatique de la tenue via qb-clothing (server event/export)
 local function saveOutfitToQbClothing(outfit)
+    if not outfit or type(outfit) ~= 'table' then
+        print('[eboueur] saveOutfitToQbClothing: outfit is nil or not a table, skipping save')
+        return false
+    end
     -- Try explicit clothing event used by some qb-clothing versions
     if GetResourceState('qb-clothing') == 'started' or GetResourceState('clothing') == 'started' then
         local saved = false
@@ -199,7 +210,7 @@ local function restoreOutfit()
             -- Try events/exports to restore the saved original outfit
             TriggerEvent('qb-clothing:client:loadOutfit', originalOutfit)
             TriggerEvent('qb-clothing:client:LoadOutfit', originalOutfit)
-            if exports['qb-clothing'] then
+            if exports and exports['qb-clothing'] then
                 pcall(function() exports['qb-clothing']:loadOutfit(originalOutfit) end)
                 pcall(function() exports['qb-clothing']:ApplyPlayerOutfit(originalOutfit) end)
             end
@@ -318,6 +329,31 @@ end
 
 -- Blips management
 local targetBlips = {}
+local jobBlip = nil
+local jobBlipVisible = true
+local garageMarkerVisible = true
+local targetZones = {}
+
+local function CreateJobBlip()
+    if not jobBlipVisible then return end
+    if jobBlip and DoesBlipExist(jobBlip) then return end
+    local g = Config.Garage
+    jobBlip = AddBlipForCoord(g.x, g.y, g.z)
+    SetBlipSprite(jobBlip, Config.JobBlip.sprite or 318)
+    SetBlipColour(jobBlip, Config.JobBlip.color or 5)
+    SetBlipScale(jobBlip, Config.JobBlip.scale or 0.9)
+    SetBlipAsShortRange(jobBlip, false)
+    BeginTextCommandSetBlipName('STRING')
+    AddTextComponentString(Config.JobBlip.name or 'Job Éboueur')
+    EndTextCommandSetBlipName(jobBlip)
+end
+
+local function RemoveJobBlip()
+    if jobBlip and DoesBlipExist(jobBlip) then
+        RemoveBlip(jobBlip)
+        jobBlip = nil
+    end
+end
 function CreateTargetsBlips()
     for i, v in ipairs(currentTargets) do
         local blip = AddBlipForCoord(v.pos.x, v.pos.y, v.pos.z)
@@ -333,15 +369,127 @@ function CreateTargetsBlips()
         AddTextComponentString(Config.BinTypes[binType].label .. ' #' .. tostring(i))
         EndTextCommandSetBlipName(blip)
         table.insert(targetBlips, blip)
+        -- Register qb-target zone for this point if available
+        if GetResourceState('qb-target') == 'started' then
+            local zoneName = 'eboueur_point_' .. tostring(i) .. '_' .. tostring(math.random(1000,9999))
+            targetZones[#targetZones+1] = zoneName
+            local ok, err = pcall(function()
+                exports['qb-target']:AddCircleZone(zoneName, v.pos, Config.PickupRadius or 3.0, {
+                    name = zoneName,
+                    debugPoly = false
+                }, {
+                    options = {
+                        {
+                            event = 'eboueur:client:collectPoint',
+                            icon = 'fas fa-dumpster',
+                            label = 'Ramasser'
+                        }
+                    },
+                    distance = 3.5
+                })
+            end)
+            if not ok then
+                print('[eboueur] qb-target AddCircleZone failed: ' .. tostring(err))
+            end
+        end
     end
 end
+
+-- Create job blip on resource start
+Citizen.CreateThread(function()
+    Citizen.Wait(1000)
+    jobBlipVisible = Config.JobBlip.enabled ~= false
+    garageMarkerVisible = Config.GarageMarker.enabled ~= false
+    if jobBlipVisible then CreateJobBlip() end
+end)
+
+-- Remove job blip on resource stop (cleanup)
+AddEventHandler('onResourceStop', function(resourceName)
+    if GetCurrentResourceName() == resourceName then
+        RemoveJobBlip()
+    end
+end)
+
+-- NUI callbacks pour toggle Blip/Marker
+RegisterNUICallback('toggleBlip', function(data, cb)
+    if data and type(data.visible) == 'boolean' then
+        jobBlipVisible = data.visible
+        if jobBlipVisible then CreateJobBlip() else RemoveJobBlip() end
+        -- envoyer mise à jour aux NUI
+        SendNUIMessage({ action = 'updateSettings', jobBlipVisible = jobBlipVisible, garageMarkerVisible = garageMarkerVisible })
+        cb({ ok = true })
+        return
+    end
+    cb({ ok = false })
+end)
+
+RegisterNUICallback('toggleMarker', function(data, cb)
+    if data and type(data.visible) == 'boolean' then
+        garageMarkerVisible = data.visible
+        SendNUIMessage({ action = 'updateSettings', jobBlipVisible = jobBlipVisible, garageMarkerVisible = garageMarkerVisible })
+        cb({ ok = true })
+        return
+    end
+    cb({ ok = false })
+end)
+
+-- Draw garage marker when enabled
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        if garageMarkerVisible then
+            local ped = PlayerPedId()
+            local ppos = GetEntityCoords(ped)
+            local dist = #(ppos - Config.Garage)
+            if dist < 50.0 then
+                local m = Config.GarageMarker
+                DrawMarker(m.type or 2, Config.Garage.x, Config.Garage.y, Config.Garage.z - 1.0, 0,0,0, 0,0,0, m.scale.x, m.scale.y, m.scale.z, m.color.r, m.color.g, m.color.b, m.color.a, false, false, 2, false, nil, nil, false)
+            else
+                Citizen.Wait(500)
+            end
+        else
+            Citizen.Wait(500)
+        end
+    end
+end)
 
 function RemoveTargetsBlips()
     for _, b in ipairs(targetBlips) do
         RemoveBlip(b)
     end
     targetBlips = {}
+    -- Remove qb-target zones
+    if GetResourceState('qb-target') == 'started' then
+        for _, zname in ipairs(targetZones) do
+            local ok, err = pcall(function()
+                if exports and exports['qb-target'] and exports['qb-target'].RemoveZone then
+                    exports['qb-target']:RemoveZone(zname)
+                else
+                    -- Some versions expose a RemoveZone global function
+                    pcall(function() exports['qb-target']:RemoveZone(zname) end)
+                end
+            end)
+            if not ok then
+                print('[eboueur] qb-target RemoveZone failed: ' .. tostring(err))
+            end
+        end
+    end
+    targetZones = {}
 end
+
+-- Handler called by qb-target interaction
+RegisterNetEvent('eboueur:client:collectPoint')
+AddEventHandler('eboueur:client:collectPoint', function()
+    local ped = PlayerPedId()
+    local ppos = GetEntityCoords(ped)
+    for i, v in ipairs(currentTargets) do
+        if v.pos and #(ppos - v.pos) <= (Config.PickupRadius or 3.0) then
+            collectAt(i)
+            return
+        end
+    end
+    TriggerEvent('chat:addMessage', { args = { '^2EBOUEUR', 'Aucun point à ramasser à proximité.' } })
+end)
 
 -- Main loop: check for player near targets and handle pickup
 Citizen.CreateThread(function()
@@ -393,9 +541,8 @@ function collectAt(index)
     -- give XP and reward
     TriggerServerEvent('eboueur:addXP', binConf.xp)
     if binConf.reward and binConf.reward > 0 then
-        TriggerEvent('chat:addMessage', { args = { '^2EBOUEUR', 'Récompense: $' .. tostring(binConf.reward) } })
-        -- Ici, vous pouvez ajouter un TriggerServerEvent pour donner de l'argent ou un objet
-        -- Ex: TriggerServerEvent('eboueur:giveReward', binConf.reward)
+        -- Donner la récompense côté serveur (argent)
+        TriggerServerEvent('eboueur:giveReward', binConf.reward)
     end
     -- remove target
     table.remove(currentTargets, index)

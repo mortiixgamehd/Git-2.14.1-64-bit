@@ -91,6 +91,25 @@ window.addEventListener('message', function(event) {
     document.getElementById('level').innerText = d.data.level || 1
     document.getElementById('xp').innerText = d.data.xp || 0
   }
+  if (d.action === 'updateSettings') {
+    if (typeof d.jobBlipVisible !== 'undefined' && document.getElementById('jobBlipToggle')) document.getElementById('jobBlipToggle').checked = d.jobBlipVisible
+    if (typeof d.garageMarkerVisible !== 'undefined' && document.getElementById('garageMarkerToggle')) document.getElementById('garageMarkerToggle').checked = d.garageMarkerVisible
+  }
+  if (d.action === 'updateZones') {
+    try {
+      window.customZones = d.zones || {}
+      // Mettre à jour le select
+      const select = document.getElementById('zone')
+      Object.keys(window.customZones).forEach(name => {
+        if (!Array.from(select.options).some(opt => opt.value === name)) {
+          const opt = document.createElement('option')
+          opt.value = name
+          opt.textContent = name + ' (perso)'
+          select.appendChild(opt)
+        }
+      })
+    } catch(e) {}
+  }
 })
 
 
@@ -113,3 +132,18 @@ document.getElementById('start').addEventListener('click', function() {
 document.getElementById('close').addEventListener('click', function() {
   fetch(`https://${GetParentResourceName()}/close`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
 })
+
+// Toggle blip and marker
+if (document.getElementById('jobBlipToggle')) {
+  document.getElementById('jobBlipToggle').addEventListener('change', function() {
+    const visible = this.checked
+    fetch(`https://${GetParentResourceName()}/toggleBlip`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible }) })
+  })
+}
+
+if (document.getElementById('garageMarkerToggle')) {
+  document.getElementById('garageMarkerToggle').addEventListener('change', function() {
+    const visible = this.checked
+    fetch(`https://${GetParentResourceName()}/toggleMarker`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ visible }) })
+  })
+}

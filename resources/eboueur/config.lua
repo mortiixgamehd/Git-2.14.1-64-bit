@@ -78,4 +78,27 @@ Config.WorkOutfit = {
 -- Durée (ms) pour enfiler/retirer la tenue de travail
 Config.ChangeOutfitTime = 2500
 
+-- Job blip configuration
+Config.JobBlip = {
+    sprite = 318,
+    color = 5,
+    scale = 0.9,
+    name = 'Job Éboueur'
+}
+
+-- Enable/disable job blip by default
+Config.JobBlip.enabled = true
+
+-- Garage marker configuration (3D marker visible in-game)
+Config.GarageMarker = {
+    enabled = true,
+    type = 2,
+    scale = { x = 1.2, y = 1.2, z = 1.0 },
+    color = { r = 0, g = 150, b = 255, a = 150 }
+}
+
+-- Système monétaire à utiliser: 'qb-core', 'qb-banking', 'esx' ou 'auto'
+-- 'auto' essaiera first QBCore, then qb-banking, then ESX fallback
+Config.CurrencySystem = 'auto'
+
 return Config

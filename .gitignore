@@ -1,3 +1,17 @@
+# Fichiers temporaires et de persistance
+*.json
+*.log
+node_modules/
+.DS_Store
+.env
+# VSCode
+.vscode/
+# FiveM
+cache/
+logs/
+# Autres
+__pycache__/
+.idea/
 # Compiled Lua sources
 luac.out
 

@@ -1,21 +1,53 @@
-# Resource `eboueur`
+# Eboueur-QBCore
 
-Script FiveM pour job coopératif éboueur (prototype)
+Script FiveM QBCore : Job coopératif éboueur avancé
 
-Installation
-- Copiez le dossier `eboueur` dans votre dossier `resources` du serveur FiveM.
-- Ajoutez `ensure eboueur` dans votre `server.cfg`.
+-
+## Aperçu
+![Panel de mission](docs/panel.png)
 
-Utilisation
-- Ouvrir le panneau: appuyez sur `F6` ou utilisez la commande `/eboueur_ui`.
-- Démarrer une mission depuis le panneau.
-- Vous devez être dans le camion pour ramasser les poubelles.
-- Le script gère XP et niveaux côté serveur (stockage simple dans `eboueur_data.json`).
+## Fonctionnalités
+- Missions avancées par zone (Mission Row, Mirror Park, Place des Cubes, Sandy Shores)
+- Création et sauvegarde de zones personnalisées (panel NUI, persistance serveur)
+- Types de poubelles (classique, recyclage, toxique) avec XP et récompenses
+- Progression, niveaux, XP, panel interactif
+- Tenue de travail, garage de spawn camion
+- Restriction du job aux citoyens
+- Synchronisation automatique des zones personnalisées entre joueurs
 
-Notes
-- Le script tente de détecter QBCore ou ESX pour restreindre le job aux citoyens. Ajustez la fonction `IsCitizen()` dans `client.lua` si votre serveur utilise un autre système.
-- Coordonnées du garage, points de mission et paramètres sont dans `config.lua`.
-- Ce script est un prototype et nécessite des adaptations (sécurité, persistance DB, permissions) pour production.
+## Installation
+1. Copier le dossier `eboueur` dans `resources` de votre serveur FiveM
+2. Ajouter dans `server.cfg` :
+	```
+	ensure eboueur
+	```
+3. Démarrer le serveur
 
-Intégration `qb-clothing`
-- Si `qb-clothing` est présent sur le serveur, `eboueur` tentera d'utiliser les events/exports courants pour appliquer la tenue de travail et **sauvegarder automatiquement** la tenue sous le nom `Eboueur` (tentatives best-effort sur les noms d'événements communs). Si votre version de `qb-clothing` utilise un nom d'event/export différent, indiquez-le pour que je l'ajuste.
+## Utilisation
+- Ouvrir le panneau : touche `F6` ou commande `/eboueur_ui`
+- Choisir une zone ou créer une zone personnalisée
+- Démarrer la mission, nettoyer les points indiqués
+- Prendre/retirer la tenue au garage
+
+## Fichiers importants
+- `client.lua` : logique client, missions, tenues, NUI
+- `server.lua` : XP, niveaux, stockage, zones personnalisées
+- `config.lua` : configuration des missions, garage, tenues
+- `html/` : interface NUI (panel, JS, CSS)
+- `eboueur_data.json` : progression XP/levels
+- `eboueur_zones.json` : stockage des zones personnalisées
+
+## Personnalisation
+- Ajoutez/modifiez les zones dans le panel NUI
+- Les zones sont synchronisées et sauvegardées côté serveur
+- Adaptez les types de poubelles et récompenses dans `config.lua`
+
+## Intégration QBCore / qb-clothing
+- Compatible QBCore (job citoyen, tenues)
+- Si `qb-clothing` est présent, la tenue est sauvegardée automatiquement
+
+## Support
+Pour toute demande d’adaptation, bug ou ajout de fonctionnalité, ouvrez une issue sur GitHub ou contactez mortiixgamehd.
+
+## Licence
+Ce script est fourni à titre d’exemple et peut être adapté librement pour usage personnel ou communautaire.
