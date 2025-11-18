@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Eboueur</title>
+</head>
+<body>
+  <div id="panel" class="hidden">
+    <h2>Job Éboueur</h2>
+    <div id="data">
+      <p>Level: <span id="level">1</span></p>
+      <p>XP: <span id="xp">0</span></p>
+    </div>
+    <label for="zone">Zone de mission :</label>
+    <select id="zone">
+      <option value="Mission Row">Mission Row</option>
+      <option value="Mirror Park">Mirror Park</option>
+      <option value="Place des Cubes">Place des Cubes</option>
+      <option value="Sandy Shores">Sandy Shores</option>
+    </select>
+    <button id="start">Démarrer mission</button>
+    <hr />
+    <h3>Zone personnalisée</h3>
+    <input type="text" id="customZoneName" placeholder="Nom de la zone" />
+    <div id="customPoints">
+      <input type="number" step="any" id="customX" placeholder="X" />
+      <input type="number" step="any" id="customY" placeholder="Y" />
+      <input type="number" step="any" id="customZ" placeholder="Z" />
+      <select id="customType">
+        <option value="normal">Classique</option>
+        <option value="recycle">Recyclage</option>
+        <option value="toxic">Toxique</option>
+      </select>
+      <button id="addPoint">Ajouter point</button>
+    </div>
+    <ul id="customList"></ul>
+    <button id="addZone">Ajouter la zone</button>
+    <button id="close">Fermer</button>
+  </div>
+  <script src="script.js"></script>
+</body>
+</html>
